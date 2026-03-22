@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🐍 Snake & Ladder Game 🪜</title>
+<style>
+  /* ── Reset & Base ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    min-height: 100vh;
+    color: #eee;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+  }
+
+  h1 {
+    font-size: clamp(1.4rem, 4vw, 2.2rem);
+    text-align: center;
+    margin-bottom: 6px;
+    background: linear-gradient(90deg, #f7971e, #ffd200, #f7971e);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: 2px;
+    text-shadow: none;
+  }
+
+  .subtitle { text-align: center; color: #aac; margin-bottom: 18px; font-size: .9rem; }
+
+  /* ── Layout ── */
+  .game-wrapper {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 100%;
+    max-width: 1100px;
+  }
+
+  /* ── Board ── */
+  .board-container {
+    background: rgba(255,255,255,0.05);
+    border-radius: 16px;
+    padding: 14px;
+    border: 1px solid rgba(255,255,255,0.1);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+
+  #board {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 3px;
+    width: min(560px, 92vw);
+    aspect-ratio: 1;
+  }
+
+  .cell {
+    background: rgba(255,255,255,0.07);
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(7px, 1.1vw, 12px);
+    font-weight: 600;
+    color: #ccc;
+    position: relative;
+    cursor: default;
+    transition: transform .15s;
+    border: 1px solid rgba(255,255,255,0.06);
+    min-height: 0;
+    aspect-ratio: 1;
+  }
+
+  .cell .num {
+    font-size: clamp(6px, 0.9vw, 10px);
+    opacity: .65;
+    line-height: 1;
+  }
+
+  .cell.ladder { background: linear-gradient(135deg, #1a472a, #2d6a4f); border-color: #52b788; color: #b7e4c7; }
+  .cell.snake  { background: linear-gradient(135deg, #6b1a1a, #c0392b); border-color: #e74c3c; color: #ffc4c4; }
+  .cell.highlight { animation: pulse .6s ease-in-out; }
+
+  @keyframes pulse {
+    0%,100% { transform: scale(1); }
+    50%      { transform: scale(1.18); box-shadow: 0 0 20px #ffd200; }
+  }
+
+  /* player tokens on cell */
+  .tokens { display: flex; gap: 1px; flex-wrap: wrap; justify-content: center; }
+  .token {
+    width: clamp(10px, 1.8vw, 18px);
+    height: clamp(10px, 1.8vw, 18px);
+    border-radius: 50%;
+    border: 2px solid #fff;
+    font-size: clamp(6px, 1vw, 10px);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 900;
+    box-shadow: 0 2px 6px rgba(0,0,0,.5);
+  }
+  .token.p1 { background: #e74c3c; }
+  .token.p2 { background: #3498db; }
+
+  /* snake/ladder icon */
+  .cell-icon { font-size: clamp(8px, 1.4vw, 14px); line-height: 1; }
+
+  /* ── Side Panel ── */
+  .panel {
+    width: min(320px, 92vw);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .card {
+    background: rgba(255,255,255,0.06);
+    border-radius: 14px;
+    padding: 16px;
+    border: 1px solid rgba(255,255,255,0.1);
+    box-shadow: 0 4px 20px rgba(0,0,0,.3);
+  }
+
+  .card h3 {
+    font-size: .8rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #ffd200;
+    margin-bottom: 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding-bottom: 8px;
+  }
+
+  /* Player score cards */
+  .player-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px;
+    border-radius: 10px;
+    transition: background .3s;
+    border: 2px solid transparent;
+  }
+  .player-card.active { background: rgba(255,210,0,0.12); border-color: #ffd200; }
+
+  .avatar {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem;
+    font-weight: 900;
+    flex-shrink: 0;
+    border: 3px solid rgba(255,255,255,.3);
+  }
+  .avatar.p1 { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+  .avatar.p2 { background: linear-gradient(135deg, #3498db, #2980b9); }
+
+  .player-info { flex: 1; }
+  .player-name { font-weight: 700; font-size: .95rem; }
+  .player-pos  { font-size: .8rem; color: #aac; margin-top: 2px; }
+
+  .progress-bar {
+    height: 6px; background: rgba(255,255,255,.1);
+    border-radius: 99px; overflow: hidden; margin-top: 6px;
+  }
+  .progress-fill {
+    height: 100%; border-radius: 99px;
+    transition: width .5s ease;
+  }
+  .p1 .progress-fill { background: linear-gradient(90deg, #e74c3c, #ff6b6b); }
+  .p2 .progress-fill { background: linear-gradient(90deg, #3498db, #74b9ff); }
+
+  /* Dice */
+  #dice-display {
+    font-size: 5rem;
+    text-align: center;
+    line-height: 1;
+    transition: transform .1s;
+    cursor: default;
+    filter: drop-shadow(0 4px 12px rgba(0,0,0,.5));
+    min-height: 90px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #dice-display.rolling { animation: shake .5s ease; }
+  @keyframes shake {
+    0%,100% { transform: translateX(0) rotate(0deg); }
+    20%      { transform: translateX(-6px) rotate(-10deg); }
+    40%      { transform: translateX(6px) rotate(10deg); }
+    60%      { transform: translateX(-4px) rotate(-6deg); }
+    80%      { transform: translateX(4px) rotate(6deg); }
+  }
+
+  #roll-btn {
+    width: 100%;
+    padding: 14px;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #f7971e, #ffd200);
+    color: #1a1a2e;
+    cursor: pointer;
+    transition: transform .12s, box-shadow .12s, opacity .2s;
+    box-shadow: 0 4px 16px rgba(247,151,30,.4);
+  }
+  #roll-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(247,151,30,.6); }
+  #roll-btn:active:not(:disabled) { transform: translateY(0); }
+  #roll-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+  /* Log */
+  #log {
+    height: 200px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,.2) transparent;
+  }
+  .log-entry {
+    font-size: .8rem;
+    padding: 5px 8px;
+    border-radius: 6px;
+    background: rgba(255,255,255,.04);
+    border-left: 3px solid transparent;
+    animation: fadeIn .25s ease;
+  }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
+  .log-entry.p1    { border-color: #e74c3c; }
+  .log-entry.p2    { border-color: #3498db; }
+  .log-entry.snake { border-color: #e74c3c; background: rgba(231,76,60,.1); }
+  .log-entry.ladder{ border-color: #52b788;  background: rgba(82,183,136,.1); }
+  .log-entry.win   { border-color: #ffd200; background: rgba(255,210,0,.12); font-weight:700; }
+  .log-entry.bonus { border-color: #ffd200; }
+
+  /* Legend */
+  .legend { display: flex; gap: 10px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: .78rem; }
+  .leg-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+  .leg-dot.ladder { background: #52b788; }
+  .leg-dot.snake  { background: #e74c3c; }
+  .leg-dot.p1     { background: #e74c3c; border-radius: 50%; }
+  .leg-dot.p2     { background: #3498db; border-radius: 50%; }
+
+  /* Setup screen */
+  #setup-screen {
+    position: fixed; inset: 0;
+    background: rgba(10,10,30,.95);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+    backdrop-filter: blur(4px);
+  }
+  .setup-box {
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    border: 1px solid rgba(255,255,255,.15);
+    border-radius: 20px;
+    padding: 36px;
+    max-width: 380px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,.6);
+  }
+  .setup-box h2 { font-size: 1.6rem; margin-bottom: 6px; color: #ffd200; }
+  .setup-box p  { color: #aac; margin-bottom: 24px; font-size: .9rem; }
+
+  .input-group { margin-bottom: 16px; text-align: left; }
+  .input-group label { display: block; font-size: .8rem; color: #aac; margin-bottom: 5px; }
+  .input-group input {
+    width: 100%;
+    padding: 11px 14px;
+    border-radius: 9px;
+    border: 1px solid rgba(255,255,255,.15);
+    background: rgba(255,255,255,.08);
+    color: #eee;
+    font-size: .95rem;
+    outline: none;
+    transition: border-color .2s;
+  }
+  .input-group input:focus { border-color: #ffd200; }
+
+  .start-btn {
+    width: 100%;
+    padding: 14px;
+    font-size: 1.05rem;
+    font-weight: 700;
+    border: none; border-radius: 10px;
+    background: linear-gradient(135deg, #f7971e, #ffd200);
+    color: #1a1a2e;
+    cursor: pointer;
+    margin-top: 8px;
+    letter-spacing: 1px;
+    box-shadow: 0 4px 20px rgba(247,151,30,.4);
+    transition: transform .12s;
+  }
+  .start-btn:hover { transform: translateY(-2px); }
+
+  /* Win overlay */
+  #win-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.8);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 200;
+    backdrop-filter: blur(6px);
+  }
+  #win-overlay.show { display: flex; }
+  .win-box {
+    background: linear-gradient(135deg, #1a472a, #2d6a4f);
+    border: 2px solid #ffd200;
+    border-radius: 20px;
+    padding: 40px 36px;
+    text-align: center;
+    max-width: 380px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0,0,0,.7);
+    animation: popIn .4s cubic-bezier(.175,.885,.32,1.275);
+  }
+  @keyframes popIn { from { transform:scale(.5); opacity:0; } to { transform:scale(1); opacity:1; } }
+  .win-box .trophy { font-size: 4rem; margin-bottom: 10px; }
+  .win-box h2 { font-size: 1.7rem; color: #ffd200; margin-bottom: 6px; }
+  .win-box p  { color: #b7e4c7; margin-bottom: 24px; }
+  .win-actions { display: flex; gap: 12px; }
+  .win-actions button {
+    flex: 1; padding: 12px; border: none; border-radius: 10px;
+    font-size: .9rem; font-weight: 700; cursor: pointer; transition: transform .12s;
+  }
+  .win-actions button:hover { transform: translateY(-2px); }
+  .btn-replay { background: linear-gradient(135deg, #f7971e, #ffd200); color: #1a1a2e; }
+  .btn-quit   { background: rgba(255,255,255,.1); color: #eee; border: 1px solid rgba(255,255,255,.2); }
+
+  /* Confetti canvas */
+  #confetti-canvas {
+    position: fixed; inset: 0; pointer-events: none; z-index: 150;
+  }
+
+  /* Responsive */
+  @media (max-width: 640px) {
+    .game-wrapper { gap: 14px; }
+    .panel { width: 92vw; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Setup Screen -->
+<div id="setup-screen">
+  <div class="setup-box">
+    <div style="font-size:3rem;margin-bottom:8px">🐍🪜</div>
+    <h2>Snake & Ladder</h2>
+    <p>Classic 2-player board game — first to reach <strong style="color:#ffd200">100</strong> wins!</p>
+    <div class="input-group">
+      <label>🔴 Player 1 Name</label>
+      <input id="p1-name" type="text" placeholder="Player 1" maxlength="16">
+    </div>
+    <div class="input-group">
+      <label>🔵 Player 2 Name</label>
+      <input id="p2-name" type="text" placeholder="Player 2" maxlength="16">
+    </div>
+    <button class="start-btn" onclick="startGame()">🎮 Start Game</button>
+  </div>
+</div>
+
+<!-- Win Overlay -->
+<div id="win-overlay">
+  <div class="win-box">
+    <div class="trophy">🏆</div>
+    <h2 id="win-title">Player 1 Wins!</h2>
+    <p id="win-sub">Reached 100 first. Well played!</p>
+    <div class="win-actions">
+      <button class="btn-replay" onclick="replayGame()">🔄 Play Again</button>
+      <button class="btn-quit"   onclick="newGame()">🏠 New Game</button>
+    </div>
+  </div>
+</div>
+
+<canvas id="confetti-canvas"></canvas>
+
+<h1>🐍 Snake &amp; Ladder 🪜</h1>
+<p class="subtitle">2-Player Edition — Roll the dice, climb ladders, dodge snakes!</p>
+
+<div class="game-wrapper">
+
+  <!-- Board -->
+  <div class="board-container">
+    <div id="board"></div>
+  </div>
+
+  <!-- Side Panel -->
+  <div class="panel">
+
+    <!-- Players -->
+    <div class="card">
+      <h3>👥 Players</h3>
+      <div id="p1-card" class="player-card p1 active">
+        <div class="avatar p1" id="p1-avatar">P1</div>
+        <div class="player-info p1">
+          <div class="player-name" id="p1-label">Player 1</div>
+          <div class="player-pos"  id="p1-pos">Position: 0 / 100</div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="p1-bar" style="width:0%"></div>
+          </div>
+        </div>
+      </div>
+      <div style="height:10px"></div>
+      <div id="p2-card" class="player-card p2">
+        <div class="avatar p2" id="p2-avatar">P2</div>
+        <div class="player-info p2">
+          <div class="player-name" id="p2-label">Player 2</div>
+          <div class="player-pos"  id="p2-pos">Position: 0 / 100</div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="p2-bar" style="width:0%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dice -->
+    <div class="card" style="text-align:center">
+      <h3>🎲 Dice</h3>
+      <div id="dice-display">⬜</div>
+      <div id="turn-label" style="color:#ffd200;font-weight:700;margin:8px 0 12px;font-size:.95rem">
+        Player 1's Turn
+      </div>
+      <button id="roll-btn" onclick="rollDice()">🎲 Roll Dice</button>
+    </div>
+
+    <!-- Legend -->
+    <div class="card">
+      <h3>📖 Legend</h3>
+      <div class="legend">
+        <div class="legend-item"><div class="leg-dot ladder"></div> Ladder (bottom)</div>
+        <div class="legend-item"><div class="leg-dot snake"></div>  Snake (head)</div>
+        <div class="legend-item"><div class="leg-dot p1"></div> <span id="leg-p1">Player 1</span></div>
+        <div class="legend-item"><div class="leg-dot p2"></div> <span id="leg-p2">Player 2</span></div>
+      </div>
+      <div style="margin-top:10px;font-size:.75rem;color:#778;">
+        🪜 Ladders: 2→23, 8→34, 20→77, 32→68, 41→79, 60→91<br>
+        🐍 Snakes:  99→10, 95→56, 70→55, 52→42, 85→7, 30→12
+      </div>
+    </div>
+
+    <!-- Log -->
+    <div class="card">
+      <h3>📜 Game Log</h3>
+      <div id="log"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Audio context for synthesised sounds -->
+<script>
+// ══════════════════════════════════════════════════════
+// GAME DATA
+// ══════════════════════════════════════════════════════
+const LADDERS = { 2:23, 8:34, 20:77, 32:68, 41:79, 60:91 };
+const SNAKES  = { 99:10, 95:56, 70:55, 52:42, 85:7, 30:12 };
+
+const DICE_FACES = ['⚀','⚁','⚂','⚃','⚄','⚅'];
+
+let state = {
+  names:     ['Player 1', 'Player 2'],
+  positions: [0, 0],
+  current:   0,       // 0 or 1
+  rolling:   false,
+  over:      false,
+};
+
+// ══════════════════════════════════════════════════════
+// AUDIO (Web Audio API — synthesised, no files needed)
+// ══════════════════════════════════════════════════════
+let audioCtx = null;
+
+function getAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playTone(freq, dur, type='sine', vol=0.3, delay=0) {
+  try {
+    const ctx  = getAudio();
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, ctx.currentTime + delay);
+    gain.gain.setValueAtTime(vol, ctx.currentTime + delay);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + dur);
+    osc.start(ctx.currentTime + delay);
+    osc.stop(ctx.currentTime + delay + dur);
+  } catch(e) {}
+}
+
+function soundDice() {
+  // rapid noise bursts
+  for (let i = 0; i < 6; i++) {
+    const f = 200 + Math.random() * 400;
+    playTone(f, 0.06, 'square', 0.15, i * 0.07);
+  }
+}
+
+function soundLadder() {
+  // ascending cheerful notes
+  [523, 659, 784, 1047].forEach((f, i) => playTone(f, 0.18, 'triangle', 0.35, i * 0.12));
+}
+
+function soundSnake() {
+  // descending hiss-like sweep
+  try {
+    const ctx  = getAudio();
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(600, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.7);
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.7);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.75);
+  } catch(e) {}
+}
+
+function soundBonus() {
+  // two quick dings
+  playTone(880, 0.12, 'sine', 0.4, 0);
+  playTone(1100,0.15, 'sine', 0.4, 0.14);
+}
+
+function soundWin() {
+  // fanfare
+  const melody = [523,659,784,1047,784,1047];
+  melody.forEach((f,i) => playTone(f, 0.2, 'triangle', 0.45, i*0.14));
+}
+
+// ══════════════════════════════════════════════════════
+// BOARD SETUP
+// ══════════════════════════════════════════════════════
+function buildBoard() {
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+
+  for (let row = 0; row < 10; row++) {
+    for (let col = 0; col < 10; col++) {
+      // Calculate square number (snaking pattern)
+      let num;
+      if (row % 2 === 0) {
+        // Even row: right-to-left
+        num = 100 - row * 10 - col;
+      } else {
+        // Odd row: left-to-right
+        num = 100 - row * 10 - (9 - col);
+      }
+
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.id = `cell-${num}`;
+
+      let icon = '';
+      if (LADDERS[num]) { cell.classList.add('ladder'); icon = '🪜'; }
+      if (SNAKES[num])  { cell.classList.add('snake');  icon = '🐍'; }
+
+      cell.innerHTML = `
+        <div class="num">${num}</div>
+        ${icon ? `<div class="cell-icon">${icon}</div>` : ''}
+        <div class="tokens" id="tokens-${num}"></div>
+      `;
+
+      // Tooltip
+      if (LADDERS[num]) cell.title = `Ladder: ${num} → ${LADDERS[num]}`;
+      if (SNAKES[num])  cell.title = `Snake:  ${num} → ${SNAKES[num]}`;
+
+      board.appendChild(cell);
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// TOKEN RENDERING
+// ══════════════════════════════════════════════════════
+function renderTokens() {
+  // Clear all token containers
+  document.querySelectorAll('.tokens').forEach(t => t.innerHTML = '');
+
+  state.positions.forEach((pos, pi) => {
+    if (pos === 0) return;
+    const container = document.getElementById(`tokens-${pos}`);
+    if (!container) return;
+    const tok = document.createElement('div');
+    tok.className = `token p${pi+1}`;
+    tok.textContent = state.names[pi][0].toUpperCase();
+    container.appendChild(tok);
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// UI UPDATE
+// ══════════════════════════════════════════════════════
+function updateUI() {
+  const cur = state.current;
+  [0,1].forEach(pi => {
+    const pos  = state.positions[pi];
+    const pct  = (pos / 100 * 100).toFixed(0);
+    document.getElementById(`p${pi+1}-pos`).textContent = `Position: ${pos} / 100`;
+    document.getElementById(`p${pi+1}-bar`).style.width = pct + '%';
+    document.getElementById(`p${pi+1}-card`).classList.toggle('active', pi === cur);
+  });
+  document.getElementById('turn-label').textContent =
+    `${state.names[cur]}'s Turn`;
+}
+
+// ══════════════════════════════════════════════════════
+// LOGGING
+// ══════════════════════════════════════════════════════
+function log(msg, cls='') {
+  const div = document.createElement('div');
+  div.className = `log-entry ${cls}`;
+  div.innerHTML = msg;
+  const logEl = document.getElementById('log');
+  logEl.prepend(div);
+}
+
+// ══════════════════════════════════════════════════════
+// DICE ROLL
+// ══════════════════════════════════════════════════════
+function rollDice() {
+  if (state.rolling || state.over) return;
+  state.rolling = true;
+
+  const btn  = document.getElementById('roll-btn');
+  const disp = document.getElementById('dice-display');
+  btn.disabled = true;
+
+  soundDice();
+  disp.classList.add('rolling');
+
+  // Spin animation
+  let spins = 0;
+  const maxSpins = 10;
+  const interval = setInterval(() => {
+    disp.textContent = DICE_FACES[Math.floor(Math.random() * 6)];
+    spins++;
+    if (spins >= maxSpins) {
+      clearInterval(interval);
+      disp.classList.remove('rolling');
+
+      const value = Math.floor(Math.random() * 6) + 1;
+      disp.textContent = DICE_FACES[value - 1];
+
+      setTimeout(() => processMove(value), 200);
+    }
+  }, 70);
+}
+
+// ══════════════════════════════════════════════════════
+// MOVE PROCESSING
+// ══════════════════════════════════════════════════════
+function processMove(dice) {
+  const pi   = state.current;
+  const name = state.names[pi];
+  const cls  = `p${pi+1}`;
+  let   pos  = state.positions[pi];
+
+  log(`🎲 <strong>${name}</strong> rolled <strong>${dice}</strong>`, cls);
+
+  const newPos = pos + dice;
+  if (newPos > 100) {
+    log(`⛔ ${name} needs ${100 - pos} to win — stay at ${pos}.`, cls);
+    endTurn(dice, pi);
+    return;
+  }
+
+  // Animate movement step-by-step
+  animateMove(pi, pos, newPos, dice);
+}
+
+function animateMove(pi, from, to, dice) {
+  const name = state.names[pi];
+  const cls  = `p${pi+1}`;
+  let   cur  = from;
+
+  const step = () => {
+    if (cur < to) {
+      cur++;
+      state.positions[pi] = cur;
+      renderTokens();
+      flashCell(cur);
+      setTimeout(step, 80);
+    } else {
+      // Landed — check snake/ladder
+      log(`📍 <strong>${name}</strong> moved to <strong>${cur}</strong>`, cls);
+
+      if (LADDERS[cur]) {
+        const dest = LADDERS[cur];
+        soundLadder();
+        log(`🪜 <strong>LADDER!</strong> ${name} climbs from ${cur} → <strong>${dest}</strong>!`, 'ladder');
+        setTimeout(() => {
+          state.positions[pi] = dest;
+          renderTokens();
+          flashCell(dest);
+          checkWinOrContinue(pi, dest, dice);
+        }, 400);
+      } else if (SNAKES[cur]) {
+        const dest = SNAKES[cur];
+        soundSnake();
+        log(`🐍 <strong>SNAKE!</strong> ${name} slides from ${cur} → <strong>${dest}</strong>!`, 'snake');
+        setTimeout(() => {
+          state.positions[pi] = dest;
+          renderTokens();
+          flashCell(dest);
+          checkWinOrContinue(pi, dest, dice);
+        }, 500);
+      } else {
+        checkWinOrContinue(pi, cur, dice);
+      }
+    }
+  };
+  step();
+}
+
+function flashCell(num) {
+  const cell = document.getElementById(`cell-${num}`);
+  if (!cell) return;
+  cell.classList.remove('highlight');
+  void cell.offsetWidth;
+  cell.classList.add('highlight');
+  setTimeout(() => cell.classList.remove('highlight'), 700);
+}
+
+function checkWinOrContinue(pi, pos, dice) {
+  if (pos === 100) {
+    triggerWin(pi);
+    return;
+  }
+  endTurn(dice, pi);
+}
+
+function endTurn(dice, pi) {
+  state.rolling = false;
+  updateUI();
+
+  if (dice === 6) {
+    soundBonus();
+    log(`🎯 <strong>${state.names[pi]}</strong> rolled 6 — BONUS TURN!`, 'bonus');
+    document.getElementById('roll-btn').disabled = false;
+  } else {
+    state.current = (state.current + 1) % 2;
+    updateUI();
+    document.getElementById('roll-btn').disabled = false;
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// WIN
+// ══════════════════════════════════════════════════════
+function triggerWin(pi) {
+  state.over = true;
+  const name = state.names[pi];
+  soundWin();
+  log(`🏆 <strong>${name} WINS!</strong> 🎉`, 'win');
+  updateUI();
+  renderTokens();
+
+  document.getElementById('win-title').textContent = `${name} Wins! 🏆`;
+  document.getElementById('win-sub').textContent   = `Reached 100 first — well played!`;
+  document.getElementById('win-overlay').classList.add('show');
+
+  startConfetti();
+}
+
+// ══════════════════════════════════════════════════════
+// CONFETTI
+// ══════════════════════════════════════════════════════
+let confettiAnim = null;
+
+function startConfetti() {
+  const canvas = document.getElementById('confetti-canvas');
+  const ctx    = canvas.getContext('2d');
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  const pieces = Array.from({length: 120}, () => ({
+    x:  Math.random() * canvas.width,
+    y:  Math.random() * -canvas.height,
+    r:  4 + Math.random() * 8,
+    d:  2 + Math.random() * 3,
+    color: `hsl(${Math.random()*360},80%,60%)`,
+    tilt: Math.random() * 360,
+    tiltSpeed: (Math.random() - 0.5) * 4,
+  }));
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    pieces.forEach(p => {
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, p.r, p.r/2, p.tilt * Math.PI/180, 0, Math.PI*2);
+      ctx.fillStyle = p.color;
+      ctx.fill();
+      p.y += p.d;
+      p.x += Math.sin(p.tilt * 0.05) * 1.5;
+      p.tilt += p.tiltSpeed;
+      if (p.y > canvas.height) {
+        p.y = -10; p.x = Math.random() * canvas.width;
+      }
+    });
+    confettiAnim = requestAnimationFrame(draw);
+  }
+  draw();
+  setTimeout(stopConfetti, 5000);
+}
+
+function stopConfetti() {
+  if (confettiAnim) { cancelAnimationFrame(confettiAnim); confettiAnim = null; }
+  const canvas = document.getElementById('confetti-canvas');
+  canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+}
+
+// ══════════════════════════════════════════════════════
+// GAME INIT / REPLAY
+// ══════════════════════════════════════════════════════
+function startGame() {
+  const n1 = document.getElementById('p1-name').value.trim() || 'Player 1';
+  const n2 = document.getElementById('p2-name').value.trim() || 'Player 2';
+  state.names = [n1, n2 === n1 ? n2 + ' II' : n2];
+
+  document.getElementById('p1-label').textContent = state.names[0];
+  document.getElementById('p2-label').textContent = state.names[1];
+  document.getElementById('p1-avatar').textContent = state.names[0][0].toUpperCase();
+  document.getElementById('p2-avatar').textContent = state.names[1][0].toUpperCase();
+  document.getElementById('leg-p1').textContent    = state.names[0];
+  document.getElementById('leg-p2').textContent    = state.names[1];
+
+  resetState();
+  document.getElementById('setup-screen').style.display = 'none';
+  log(`🎮 Game started! ${state.names[0]} vs ${state.names[1]}`, '');
+}
+
+function resetState() {
+  state.positions = [0, 0];
+  state.current   = 0;
+  state.rolling   = false;
+  state.over      = false;
+
+  buildBoard();
+  renderTokens();
+  updateUI();
+
+  document.getElementById('dice-display').textContent = '⬜';
+  document.getElementById('roll-btn').disabled = false;
+  document.getElementById('log').innerHTML = '';
+}
+
+function replayGame() {
+  stopConfetti();
+  document.getElementById('win-overlay').classList.remove('show');
+  resetState();
+  log(`🔄 New game! ${state.names[0]} vs ${state.names[1]}`, '');
+}
+
+function newGame() {
+  stopConfetti();
+  document.getElementById('win-overlay').classList.remove('show');
+  // Show setup screen again
+  document.getElementById('p1-name').value = '';
+  document.getElementById('p2-name').value = '';
+  document.getElementById('setup-screen').style.display = 'flex';
+  resetState();
+}
+
+// ══════════════════════════════════════════════════════
+// BOOT
+// ══════════════════════════════════════════════════════
+buildBoard();
+
+// Allow Enter key in setup
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('setup-screen').style.display !== 'none') {
+    startGame();
+  }
+});
+</script>
+</body>
+</html>
